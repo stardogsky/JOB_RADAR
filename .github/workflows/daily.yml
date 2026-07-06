@@ -9,14 +9,13 @@ concurrency:
   group: job-radar
   cancel-in-progress: false
 
-timeout-minutes: 20
-
 permissions:
   contents: write
 
 jobs:
   daily:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: ⬇️ Checkout
         uses: actions/checkout@v4
