@@ -97,6 +97,7 @@ seniority_negative:
 
 irrelevant_blacklist:
   - nurse
+  - senior
   - nursing
   - physician
   - dentist
