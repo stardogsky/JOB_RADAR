@@ -2,8 +2,8 @@ name: Job Radar Daily Digest
 
 on:
   schedule:
-    - cron: "0 6 * * *"   # 06:00 UTC = 09:00 МСК
-  workflow_dispatch: {}    # ручной запуск
+    - cron: "0 6 * * *"
+  workflow_dispatch: {}
 
 concurrency:
   group: job-radar
@@ -17,55 +17,42 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: ⬇️ Checkout
+      - name: Checkout
         uses: actions/checkout@v5
         with:
           fetch-depth: 1
 
-      - name: 🐍 Setup Python 3.11
+      - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: 📦 Cache pip
+      - name: Cache pip
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: $ runner.os -pip-$ hashFiles('requirements.txt') 
-          restore-keys: $ runner.os -pip-
+          key: pip-$ hashFiles('requirements.txt') 
+          restore-keys: pip-
 
-      - name: 🤗 Cache HuggingFace
+      - name: Cache HuggingFace
         uses: actions/cache@v4
         with:
           path: ~/.cache/huggingface
-          key: $ runner.os -hf
+          key: hf
 
-      - name: 📥 Install dependencies
+      - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: 🔍 Debug env
-        env:
-          TELEGRAM_BOT_TOKEN: $ secrets.TELEGRAM_BOT_TOKEN 
-          TELEGRAM_CHAT_ID: $ secrets.TELEGRAM_CHAT_ID 
-        run: |
-          echo "=== DEBUG ENV ==="
-          echo "TELEGRAM_BOT_TOKEN length: ${#TELEGRAM_BOT_TOKEN}"
-          echo "TELEGRAM_CHAT_ID length: ${#TELEGRAM_CHAT_ID}"
-          echo "TELEGRAM_BOT_TOKEN first 10: ${TELEGRAM_BOT_TOKEN:0:10}"
-          echo "TELEGRAM_BOT_TOKEN last 5: ${TELEGRAM_BOT_TOKEN: -5}"
-          echo "TELEGRAM_CHAT_ID value: ${TELEGRAM_CHAT_ID}"
-          echo "================="
-      
-      - name: 🚀 Run job-radar
+      - name: Run job-radar
         env:
           TELEGRAM_BOT_TOKEN: $ secrets.TELEGRAM_BOT_TOKEN 
           TELEGRAM_CHAT_ID: $ secrets.TELEGRAM_CHAT_ID 
         run: python -m src.main
 
-      - name: 💾 Commit results
+      - name: Commit results
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/jobs.sqlite data/digest_latest.csv
-          git diff --quiet && git diff --cached --quiet || git commit -m "🤖 daily: $(date -u +%Y-%m-%d)"
+          git diff --quiet && git diff --cached --quiet || git commit -m "daily: $(date -u +%Y-%m-%d)"
           git push
