@@ -43,6 +43,16 @@ jobs:
       - name: 📥 Install dependencies
         run: pip install -r requirements.txt
 
+      - name: 🔍 Debug env
+        run: |
+          echo "TELEGRAM_BOT_TOKEN length: ${#TELEGRAM_BOT_TOKEN}"
+          echo "TELEGRAM_CHAT_ID length: ${#TELEGRAM_CHAT_ID}"
+          echo "TELEGRAM_BOT_TOKEN first 10: ${TELEGRAM_BOT_TOKEN:0:10}"
+          echo "TELEGRAM_BOT_TOKEN last 5: ${TELEGRAM_BOT_TOKEN: -5}"
+        env:
+          TELEGRAM_BOT_TOKEN: $ secrets.TELEGRAM_BOT_TOKEN 
+          TELEGRAM_CHAT_ID: $ secrets.TELEGRAM_CHAT_ID 
+
       - name: 🚀 Run job-radar
         env:
           TELEGRAM_BOT_TOKEN: $ secrets.TELEGRAM_BOT_TOKEN 
