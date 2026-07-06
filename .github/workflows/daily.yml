@@ -55,8 +55,7 @@ jobs:
           echo "TELEGRAM_BOT_TOKEN last 5: ${TELEGRAM_BOT_TOKEN: -5}"
           echo "TELEGRAM_CHAT_ID value: ${TELEGRAM_CHAT_ID}"
           echo "================="
-        
-
+      
       - name: 🚀 Run job-radar
         env:
           TELEGRAM_BOT_TOKEN: $ secrets.TELEGRAM_BOT_TOKEN 
