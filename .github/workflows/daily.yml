@@ -45,8 +45,8 @@ jobs:
 
       - name: Run job-radar
         env:
-          TELEGRAM_BOT_TOKEN: $ secrets.TELEGRAM_BOT_TOKEN 
-          TELEGRAM_CHAT_ID: $ secrets.TELEGRAM_CHAT_ID 
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python -m src.main
 
       - name: Commit results
