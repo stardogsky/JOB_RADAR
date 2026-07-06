@@ -1,0 +1,21 @@
+{
+  "_comment": "Схема по официальной документации github.com/remotive-com/remote-jobs-api. Живой сэмпл снимается scripts/capture_fixtures.py (шаг 0). salary - свободный текст, часто пустой. description - HTML.",
+  "0-legal-notice": "Remotive API Legal Notice",
+  "job-count": 1,
+  "jobs": [
+    {
+      "id": 1234567,
+      "url": "https://remotive.com/remote-jobs/software-dev/example-1234567",
+      "title": "AI Automation Specialist",
+      "company_name": "Example Inc",
+      "company_logo": "https://...",
+      "category": "Software Development",
+      "tags": ["automation", "python", "api"],
+      "job_type": "full_time",
+      "publication_date": "2026-07-01T12:00:00",
+      "candidate_required_location": "Worldwide",
+      "salary": "$2,000 - $3,500/month",
+      "description": "<p>We are looking for an automation specialist to build workflows with Make, n8n and OpenAI API...</p>"
+    }
+  ]
+}

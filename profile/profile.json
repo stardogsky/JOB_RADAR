@@ -1,0 +1,36 @@
+{
+  "name": "Alexander Stavrovsky",
+  "salary_min_usd_month": 1300,
+  "remote_only": true,
+  "target_roles": [
+    "AI Automation Specialist",
+    "AI Workflow Engineer",
+    "AI Implementation Specialist",
+    "No-code Automation Specialist",
+    "Business Process Automation Specialist",
+    "CRM Automation Specialist",
+    "AI Operations Specialist",
+    "Prompt Engineer",
+    "Junior AI Automation Developer"
+  ],
+  "strong_signals": [
+    "business process analysis", "CRM implementation", "AI-first prototyping",
+    "LLM-assisted development", "workflow automation", "client communication",
+    "operations management", "API integration", "Python automation",
+    "dashboards", "data visualization", "prompt engineering", "requirements gathering"
+  ],
+  "medium_signals": [
+    "Python", "SQL", "REST API", "Streamlit", "Tableau", "Bitrix24", "amoCRM",
+    "Telegram bots", "embeddings", "webhooks", "Linux VPS"
+  ],
+  "risk_signals": [
+    "senior software engineering", "production backend ownership",
+    "deep ML engineering", "5+ years commercial programming",
+    "Kubernetes", "DevOps-heavy roles"
+  ],
+  "languages": {"russian": "native", "english": "B2"},
+  "location_constraints": {
+    "avoid": ["US only", "US work authorization", "EU work authorization required"],
+    "prefer": ["Worldwide", "Anywhere", "Global", "EMEA", "Europe remote contractors"]
+  }
+}

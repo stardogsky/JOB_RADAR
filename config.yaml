@@ -1,0 +1,190 @@
+salary_min_usd_month: 1300
+currency_rates_to_usd:
+  USD: 1.0
+  EUR: 1.08
+  GBP: 1.27
+hours_per_month: 160
+
+weights:
+  title: 0.30
+  similarity: 0.25
+  salary: 0.15
+  remote: 0.10
+  seniority: 0.10
+  keywords: 0.10
+
+positive_titles:
+  "ai automation": 1.0
+  "automation specialist": 1.0
+  "workflow automation": 1.0
+  "automation engineer": 0.9
+  "no-code": 1.0
+  "nocode": 1.0
+  "low-code": 0.9
+  "zapier": 1.0
+  "make.com": 1.0
+  "n8n": 1.0
+  "ai operations": 1.0
+  "chatbot": 0.9
+  "implementation specialist": 1.0
+  "implementation consultant": 0.9
+  "solutions consultant": 0.8
+  "prompt engineer": 0.9
+  "ai workflow": 1.0
+  "crm": 0.8
+  "business process": 0.9
+  "automation developer": 0.9
+  "ai specialist": 0.8
+  "ai engineer": 0.6
+  "integration": 0.7
+  "operations specialist": 0.7
+
+positive_keywords:
+  - ai automation
+  - automation
+  - zapier
+  - make.com
+  - n8n
+  - openai
+  - chatgpt
+  - claude
+  - gemini
+  - llm
+  - prompt
+  - workflow
+  - notion
+  - airtable
+  - crm
+  - api
+  - webhook
+  - chatbot
+  - business process
+  - integration
+  - low-code
+  - no-code
+  - gpt
+  - rag
+  - embeddings
+
+negative_keywords:
+  - "5+ years"
+  - "6+ years"
+  - "7+ years"
+  - "8+ years"
+  - "10+ years"
+  - kubernetes
+  - machine learning engineer
+  - computer science degree required
+  - phd
+
+seniority_positive:
+  - junior
+  - associate
+  - specialist
+  - coordinator
+  - consultant
+  - implementation
+  - assistant
+seniority_negative:
+  - senior
+  - staff
+  - principal
+  - lead
+  - "head of"
+  - director
+  - vp
+  - chief
+
+irrelevant_blacklist:
+  - nurse
+  - nursing
+  - physician
+  - dentist
+  - driver
+  - warehouse
+  - forklift
+  - firefighter
+  - teacher
+  - tutor
+  - accountant
+  - bookkeeper
+  - attorney
+  - lawyer
+  - paralegal
+  - therapist
+  - counselor
+  - recruiter
+  - realtor
+  - insurance agent
+  - underwriter
+  - chef
+  - cook
+  - barista
+  - cashier
+  - retail associate
+  - services associate
+  - security guard
+  - electrician
+  - plumber
+  - mechanic
+  - veterinarian
+  - pharmacist
+  - actuary
+
+us_only_patterns:
+  - us only
+  - u.s. only
+  - usa only
+  - united states only
+  - must be based in the us
+  - must be located in the us
+  - us work authorization
+  - authorized to work in the united states
+  - us citizens
+  - w2 employee
+  - w-2
+
+location_risk_patterns:
+  - must be located in
+  - must be based in
+  - based in the eu
+  - eu work authorization
+  - only candidates from
+
+remote_positive_markers:
+  - remote
+  - anywhere
+  - worldwide
+  - work from home
+  - fully distributed
+  - global team
+
+digest:
+  top_n: 10
+  min_score: 65
+  fallback_min_score: 50
+
+retention_days:
+  weak: 30
+  all_new: 90
+
+guards:
+  max_new_per_run: 2000
+  max_db_mb: 200
+  vacuum_every_runs: 30
+
+sources:
+  remotive:
+    enabled: true
+    urls:
+      - "https://remotive.com/api/remote-jobs?category=software-dev"
+      - "https://remotive.com/api/remote-jobs?search=automation"
+  remoteok:
+    enabled: true
+    url: "https://remoteok.com/api"
+  wwr:
+    enabled: true
+    feeds:
+      - "https://weworkremotely.com/categories/remote-programming-jobs.rss"
+      - "https://weworkremotely.com/categories/remote-devops-sysadmin-jobs.rss"
+      - "https://weworkremotely.com/categories/all-other-remote-jobs.rss"

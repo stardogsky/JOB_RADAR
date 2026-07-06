@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Структура item из WWR RSS. Живой сэмпл снимается scripts/capture_fixtures.py (шаг 0). -->
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
+  <channel>
+    <title>Recent Programming Jobs</title>
+    <link>https://weworkremotely.com/categories/remote-programming-jobs</link>
+    <item>
+      <title>Example Corp: Automation Engineer</title>
+      <region>Anywhere in the World</region>
+      <category>All Other Remote Jobs</category>
+      <description>&lt;img src="..."/&gt;&lt;p&gt;&lt;strong&gt;Headquarters:&lt;/strong&gt; United States&lt;br /&gt;&lt;strong&gt;URL:&lt;/strong&gt; &lt;a href="https://example.com"&gt;https://example.com&lt;/a&gt;&lt;/p&gt;&lt;div&gt;We are looking for someone to build internal automations with APIs, webhooks and AI tools...&lt;/div&gt;</description>
+      <pubDate>Thu, 02 Jul 2026 10:00:00 +0000</pubDate>
+      <link>https://weworkremotely.com/remote-jobs/example-corp-automation-engineer</link>
+      <guid>https://weworkremotely.com/remote-jobs/example-corp-automation-engineer</guid>
+    </item>
+  </channel>
+</rss>
