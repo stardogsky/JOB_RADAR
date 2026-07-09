@@ -209,3 +209,43 @@ sources:
     enabled: true
     feeds:
       - "https://jobspresso.co/feed/?post_type=job_listing"
+
+  landingjobs:
+    enabled: true
+    urls:
+      - "https://landing.jobs/api/v1/jobs"
+  workingnomads:
+    enabled: true
+    urls:
+      - "https://www.workingnomads.com/api/exposed_jobs/"
+  freelancer:
+    enabled: false          # freelance/contract gigs, not employment; flip to true to include
+    feeds:
+      - "https://www.freelancer.com/rss.xml"
+  # --- ATS company boards (task 1B) -------------------------------------------
+  # Add a company: find its careers URL and map it to an ats + slug:
+  #   boards.greenhouse.io/<slug>       -> { ats: greenhouse, slug: <slug> }
+  #   jobs.lever.co/<slug>              -> { ats: lever, slug: <slug> }
+  #   jobs.ashbyhq.com/<slug>           -> { ats: ashby, slug: <slug> }
+  #   <slug>.recruitee.com              -> { ats: recruitee, slug: <slug> }
+  #   jobs.smartrecruiters.com/<slug>   -> { ats: smartrecruiters, slug: <slug> }
+  #   <slug>.breezy.hr                  -> { ats: breezy, slug: <slug> }
+  # Slugs below are best-guess starters; dead/unknown slugs are logged & skipped.
+  ats:
+    enabled: true
+    companies:
+      - { ats: greenhouse, slug: remotecom, name: "Remote.com" }
+      - { ats: ashby, slug: notion, name: "Notion" }
+      - { ats: ashby, slug: zapier, name: "Zapier" }
+      - { ats: ashby, slug: ramp, name: "Ramp" }
+      - { ats: ashby, slug: linear, name: "Linear" }
+      - { ats: ashby, slug: vanta, name: "Vanta" }
+      - { ats: ashby, slug: retool, name: "Retool" }
+      - { ats: ashby, slug: clay, name: "Clay" }
+      - { ats: ashby, slug: mercury, name: "Mercury" }
+      - { ats: ashby, slug: replit, name: "Replit" }
+      - { ats: lever, slug: storyprotocol, name: "Story Protocol" }
+
+# Scoring adjustments (task 1): strong downweight, NOT a hard cut.
+seniority_mismatch_penalty: 30   # senior/lead/principal/head/... points subtracted
+remote_probably_penalty: 20      # remote only "probably" -> points subtracted + flagged
