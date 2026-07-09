@@ -673,6 +673,33 @@ def _norm_breezy(payload, company: str, cfg: dict) -> list[Job]:
     return jobs
 
 
+def _norm_workable(payload, company: str, cfg: dict) -> list[Job]:
+    items = payload.get("jobs") if isinstance(payload, dict) else payload
+    jobs = []
+    for item in (items or []):
+        if not isinstance(item, dict):
+            continue
+        title = _str(item.get("title"))
+        url = item.get("url") or item.get("shortlink") or item.get("application_url") or ""
+        if not title or not url:
+            continue
+        description = clean_description(item.get("description") or item.get("full_description") or "")
+        loc_obj = item.get("location") or {}
+        loc = ", ".join(p2 for p2 in (_str(loc_obj.get("city")), _str(loc_obj.get("region")), _str(loc_obj.get("country"))) if p2) or _str(item.get("country"))
+        flag = True if (item.get("telecommuting") is True or loc_obj.get("telecommuting") is True) else None
+        tags = [str(v) for v in (item.get("department"), item.get("employment_type")) if v]
+        jobs.append(Job(
+            source="workable", source_id=str(item.get("shortcode") or item.get("id") or item.get("code") or url),
+            title=title, company=company or None, url=url, location_raw=loc or None,
+            remote_confidence=_ats_remote(loc, flag, f"{title} {description}", cfg),
+            salary_raw=None, salary_known=parse_salary_text(None, cfg)[0],
+            salary_min_usd_month=None, salary_max_usd_month=None,
+            description=description, tags=tags,
+            date_posted=(str(item.get("created_at") or item.get("published_on") or ""))[:10] or None,
+            fetched_at=_now_iso()))
+    return jobs
+
+
 _ATS_DISPATCH = {
     "greenhouse": _norm_greenhouse,
     "lever": _norm_lever,
@@ -680,6 +707,7 @@ _ATS_DISPATCH = {
     "recruitee": _norm_recruitee,
     "smartrecruiters": _norm_smartrecruiters,
     "breezy": _norm_breezy,
+    "workable": _norm_workable,
 }
 
 
