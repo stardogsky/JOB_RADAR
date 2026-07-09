@@ -7,8 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .collectors import (
-    arbeitnow, himalayas, jobicy, jobscollider, jobspresso,
-    remoteok, remotive, wwr,
+    arbeitnow, ats, freelancer, himalayas, jobicy, jobscollider, jobspresso,
+    landingjobs, remoteok, remotive, workingnomads, wwr,
 )
 from .config import load_config
 from .db import DB
@@ -17,9 +17,10 @@ from .embeddings import Similarity
 from .export import export_csv
 from .filters import apply_hard_filters
 from .normalize import (
-    normalize_arbeitnow, normalize_himalayas, normalize_jobicy,
-    normalize_jobscollider, normalize_jobspresso,
-    normalize_remoteok, normalize_remotive, normalize_wwr,
+    normalize_arbeitnow, normalize_ats, normalize_freelancer,
+    normalize_himalayas, normalize_jobicy, normalize_jobscollider,
+    normalize_jobspresso, normalize_landingjobs, normalize_remoteok,
+    normalize_remotive, normalize_workingnomads, normalize_wwr,
 )
 from .notify import build_digest, send_telegram
 from .scoring import score_job
@@ -43,6 +44,10 @@ SOURCES = [
     ("arbeitnow", arbeitnow.fetch, normalize_arbeitnow, "each"),
     ("jobscollider", jobscollider.fetch, normalize_jobscollider, "each"),
     ("jobspresso", jobspresso.fetch, normalize_jobspresso, "each"),
+    ("landingjobs", landingjobs.fetch, normalize_landingjobs, "each"),
+    ("workingnomads", workingnomads.fetch, normalize_workingnomads, "each"),
+    ("freelancer", freelancer.fetch, normalize_freelancer, "each"),
+    ("ats", ats.fetch, normalize_ats, "each"),
 ]
 
 

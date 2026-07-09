@@ -1,4 +1,11 @@
-"""Hybrid scoring: config-driven rules + embedding similarity. Spec 02 section 5."""
+"""Hybrid scoring: config-driven rules + embedding similarity. Spec 02 section 5.
+
+Task-1 tuning (per user decisions):
+- Over-senior titles (senior/lead/principal/...) are NOT hard-cut but strongly
+  downweighted via `seniority_mismatch_penalty`.
+- remote_confidence == "probably" is kept but strongly downweighted via
+  `remote_probably_penalty` and surfaced as a flag in risks (shown in digest).
+"""
 from .models import Job
 
 
@@ -43,15 +50,21 @@ def _remote_component(job: Job, reasons: list, risks: list) -> float:
     if job.remote_confidence == "yes":
         reasons.append("remote")
         return 1.0
-    risks.append("remote status not fully confirmed")
+    # "probably" is the only other value that reaches scoring ("no" is hard-filtered).
+    # Flag + strong penalty are applied centrally in score_job.
     return 0.6
 
 
-def _seniority_component(title_low: str, cfg: dict, reasons: list, risks: list) -> float:
+def _seniority_negative_hit(title_low: str, cfg: dict):
     for word in cfg["seniority_negative"]:
         if word in title_low:
-            risks.append(f"seniority mismatch ({word})")
-            return 0.1
+            return word
+    return None
+
+
+def _seniority_component(title_low: str, cfg: dict, reasons: list) -> float:
+    if _seniority_negative_hit(title_low, cfg):
+        return 0.1  # flag + strong penalty applied centrally in score_job
     for word in cfg["seniority_positive"]:
         if word in title_low:
             reasons.append(f"seniority fit ({word})")
@@ -81,6 +94,22 @@ def _penalties(text_low: str, loc_low: str, cfg: dict, risks: list) -> int:
     return penalty
 
 
+def _adjustment_penalties(job: Job, title_low: str, cfg: dict, flags: list) -> int:
+    """Strong downweights that keep the job (never hard-cut). Flags are prepended
+    to risks so they survive the digest's 2-risk truncation."""
+    penalty = 0
+    sen = _seniority_negative_hit(title_low, cfg)
+    if sen:
+        p = int(cfg.get("seniority_mismatch_penalty", 30))
+        penalty += p
+        flags.append(f"\u2b07 over-senior ({sen}), downweight -{p}")
+    if job.remote_confidence == "probably":
+        p = int(cfg.get("remote_probably_penalty", 20))
+        penalty += p
+        flags.append(f"\u2691 remote only 'probably', downweight -{p}")
+    return penalty
+
+
 def categorize(score: int) -> str:
     if score >= 80:
         return "apply_first"
@@ -99,6 +128,7 @@ def score_job(job: Job, cosine: float, cfg: dict) -> Job:
         return job
     reasons: list[str] = []
     risks: list[str] = []
+    flags: list[str] = []
     title_low = job.title.lower()
     text_low = f"{job.title} {job.description}".lower()
     loc_low = (job.location_raw or "").lower()
@@ -108,12 +138,14 @@ def score_job(job: Job, cosine: float, cfg: dict) -> Job:
         + w["similarity"] * _similarity_component(cosine, reasons)
         + w["salary"] * _salary_component(job, reasons, risks)
         + w["remote"] * _remote_component(job, reasons, risks)
-        + w["seniority"] * _seniority_component(title_low, cfg, reasons, risks)
+        + w["seniority"] * _seniority_component(title_low, cfg, reasons)
         + w["keywords"] * _keywords_component(text_low, cfg, reasons)
     )
-    score = int(_clamp(round(raw * 100 - _penalties(text_low, loc_low, cfg, risks)), 0, 100))
+    penalty = _penalties(text_low, loc_low, cfg, risks)
+    penalty += _adjustment_penalties(job, title_low, cfg, flags)
+    score = int(_clamp(round(raw * 100 - penalty), 0, 100))
     job.score = score
     job.category = categorize(score)
     job.reasons = reasons
-    job.risks = risks
+    job.risks = flags + risks  # flags first so the 2-risk digest shows them
     return job
