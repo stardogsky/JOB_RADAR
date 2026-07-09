@@ -97,7 +97,6 @@ seniority_negative:
 
 irrelevant_blacklist:
   - nurse
-  - senior
   - nursing
   - physician
   - dentist
@@ -170,7 +169,7 @@ retention_days:
   all_new: 90
 
 guards:
-  max_new_per_run: 2000
+  max_new_per_run: 4000
   max_db_mb: 200
   vacuum_every_runs: 30
 
@@ -189,3 +188,24 @@ sources:
       - "https://weworkremotely.com/categories/remote-programming-jobs.rss"
       - "https://weworkremotely.com/categories/remote-devops-sysadmin-jobs.rss"
       - "https://weworkremotely.com/categories/all-other-remote-jobs.rss"
+  himalayas:
+    enabled: true
+    urls:
+      - "https://himalayas.app/jobs/api?limit=100"
+  jobicy:
+    enabled: true
+    urls:
+      - "https://jobicy.com/api/v2/remote-jobs?count=50&industry=dev"
+      - "https://jobicy.com/api/v2/remote-jobs?count=50&tag=automation"
+  arbeitnow:
+    enabled: true
+    urls:
+      - "https://www.arbeitnow.com/api/job-board-api"
+  jobscollider:
+    enabled: true
+    feeds:
+      - "https://jobscollider.com/remote-jobs.rss"
+  jobspresso:
+    enabled: true
+    feeds:
+      - "https://jobspresso.co/feed/?post_type=job_listing"
