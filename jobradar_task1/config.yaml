@@ -1,0 +1,302 @@
+salary_min_usd_month: 1300
+currency_rates_to_usd:
+  USD: 1.0
+  EUR: 1.08
+  GBP: 1.27
+hours_per_month: 160
+weights:
+  title: 0.3
+  similarity: 0.25
+  salary: 0.15
+  remote: 0.1
+  seniority: 0.1
+  keywords: 0.1
+positive_titles:
+  ai automation: 1.0
+  automation specialist: 1.0
+  workflow automation: 1.0
+  automation engineer: 0.9
+  no-code: 1.0
+  nocode: 1.0
+  low-code: 0.9
+  zapier: 1.0
+  make.com: 1.0
+  n8n: 1.0
+  ai operations: 1.0
+  chatbot: 0.9
+  implementation specialist: 1.0
+  implementation consultant: 0.9
+  solutions consultant: 0.8
+  prompt engineer: 0.9
+  ai workflow: 1.0
+  crm: 0.8
+  business process: 0.9
+  automation developer: 0.9
+  ai specialist: 0.8
+  ai engineer: 0.6
+  integration: 0.7
+  operations specialist: 0.7
+  system analyst: 0.9
+  systems analyst: 0.9
+  business analyst: 0.8
+  forward deployed: 1.0
+  revenue operations: 0.8
+  revenue ops: 0.8
+positive_keywords:
+- ai automation
+- automation
+- zapier
+- make.com
+- n8n
+- openai
+- chatgpt
+- claude
+- gemini
+- llm
+- prompt
+- workflow
+- notion
+- airtable
+- crm
+- api
+- webhook
+- chatbot
+- business process
+- integration
+- low-code
+- no-code
+- gpt
+- rag
+- embeddings
+negative_keywords:
+- 5+ years
+- 6+ years
+- 7+ years
+- 8+ years
+- 10+ years
+- kubernetes
+- machine learning engineer
+- computer science degree required
+- phd
+seniority_positive:
+- junior
+- associate
+- specialist
+- coordinator
+- consultant
+- implementation
+- assistant
+seniority_negative:
+- senior
+- staff
+- principal
+- lead
+- head of
+- director
+- vp
+- chief
+irrelevant_blacklist:
+- nurse
+- nursing
+- physician
+- dentist
+- driver
+- warehouse
+- forklift
+- firefighter
+- teacher
+- tutor
+- accountant
+- bookkeeper
+- attorney
+- lawyer
+- paralegal
+- therapist
+- counselor
+- recruiter
+- realtor
+- insurance agent
+- underwriter
+- chef
+- cook
+- barista
+- cashier
+- retail associate
+- services associate
+- security guard
+- electrician
+- plumber
+- mechanic
+- veterinarian
+- pharmacist
+- actuary
+us_only_patterns:
+- us only
+- u.s. only
+- usa only
+- united states only
+- must be based in the us
+- must be located in the us
+- us work authorization
+- authorized to work in the united states
+- us citizens
+- w2 employee
+- w-2
+location_risk_patterns:
+- must be located in
+- must be based in
+- based in the eu
+- eu work authorization
+- only candidates from
+remote_positive_markers:
+- remote
+- anywhere
+- worldwide
+- work from home
+- fully distributed
+- global team
+- distributed
+- telecommute
+- telecommuting
+- home-based
+- home based
+- wfh
+digest:
+  top_n: 10
+  min_score: 65
+  fallback_min_score: 50
+retention_days:
+  weak: 30
+  all_new: 90
+guards:
+  max_new_per_run: 4000
+  max_db_mb: 200
+  vacuum_every_runs: 30
+sources:
+  remotive:
+    enabled: true
+    urls:
+    - https://remotive.com/api/remote-jobs?category=software-dev
+    - https://remotive.com/api/remote-jobs?search=automation
+  remoteok:
+    enabled: true
+    url: https://remoteok.com/api
+  wwr:
+    enabled: true
+    feeds:
+    - https://weworkremotely.com/categories/remote-programming-jobs.rss
+    - https://weworkremotely.com/categories/remote-devops-sysadmin-jobs.rss
+    - https://weworkremotely.com/categories/all-other-remote-jobs.rss
+  himalayas:
+    enabled: true
+    urls:
+    - https://himalayas.app/jobs/api?limit=100
+  jobicy:
+    enabled: true
+    urls:
+    - https://jobicy.com/api/v2/remote-jobs?count=50&industry=dev
+    - https://jobicy.com/api/v2/remote-jobs?count=50&tag=automation
+  arbeitnow:
+    enabled: true
+    urls:
+    - https://www.arbeitnow.com/api/job-board-api
+  jobscollider:
+    enabled: true
+    feeds:
+    - https://jobscollider.com/remote-jobs.rss
+  jobspresso:
+    enabled: true
+    feeds:
+    - https://jobspresso.co/feed/?post_type=job_listing
+  landingjobs:
+    enabled: false
+    urls:
+    - https://landing.jobs/api/v1/jobs
+  workingnomads:
+    enabled: true
+    urls:
+    - https://www.workingnomads.com/api/exposed_jobs/
+  freelancer:
+    enabled: false
+    feeds:
+    - https://www.freelancer.com/rss.xml
+  ats:
+    enabled: true
+    companies:
+    - ats: greenhouse
+      slug: remotecom
+      name: Remote.com
+    - ats: ashby
+      slug: notion
+      name: Notion
+    - ats: ashby
+      slug: zapier
+      name: Zapier
+    - ats: ashby
+      slug: ramp
+      name: Ramp
+    - ats: ashby
+      slug: linear
+      name: Linear
+    - ats: ashby
+      slug: vanta
+      name: Vanta
+    - ats: ashby
+      slug: retool
+      name: Retool
+    - ats: ashby
+      slug: clay
+      name: Clay
+    - ats: ashby
+      slug: mercury
+      name: Mercury
+    - ats: ashby
+      slug: replit
+      name: Replit
+    - ats: lever
+      slug: storyprotocol
+      name: Story Protocol
+    - ats: ashby
+      slug: ruby-labs
+      name: Ruby Labs
+    - ats: ashby
+      slug: kiefer
+      name: Kiefer
+    - ats: greenhouse
+      slug: miro
+      name: Miro
+    - ats: greenhouse
+      slug: agoda
+      name: Agoda
+    - ats: greenhouse
+      slug: anthropic
+      name: Anthropic
+    - ats: workable
+      slug: vivid-money
+      name: Vivid Money
+seniority_mismatch_penalty: 30
+remote_probably_penalty: 20
+telegram_mine:
+  enabled: true
+  channels:
+  - zarubezhom_jobs
+  - geekjobs
+  - remotegeekjob
+  - remoteit
+  - foranalysts
+  - opento_data
+  - pydevjobc
+  - young_june
+  - wntdan
+  - it_vakansii_jobs
+  - hiddengurus
+off_domain_penalty: 25
+off_domain_terms:
+- payroll
+- benefits
+- recruiting
+- talent acquisition
+- hr operations
+- people operations
+- onboarding operations
+- hris
