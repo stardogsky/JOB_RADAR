@@ -1,172 +1,165 @@
-"""Job Radar orchestration. One run: collect -> normalize -> dedupe -> filter ->
-score -> store -> export -> notify. Exit 0 = ok/degraded, exit 1 = fatal."""
-import logging
-import sys
-import time
-from datetime import datetime, timezone
-from pathlib import Path
+"""Hybrid scoring: config-driven rules + embedding similarity. Spec 02 section 5.
 
-from .collectors import (
-    arbeitnow, ats, freelancer, himalayas, jobicy, jobscollider, jobspresso,
-    landingjobs, remoteok, remotive, workingnomads, wwr,
-)
-from .config import load_config
-from .db import DB
-from .dedupe import content_hash
-from .embeddings import Similarity
-from .export import export_csv
-from .filters import apply_hard_filters
-from .normalize import (
-    normalize_arbeitnow, normalize_ats, normalize_freelancer,
-    normalize_himalayas, normalize_jobicy, normalize_jobscollider,
-    normalize_jobspresso, normalize_landingjobs, normalize_remoteok,
-    normalize_remotive, normalize_workingnomads, normalize_wwr,
-)
-from .notify import build_digest, send_telegram
-from .scoring import score_job
-
-logging.basicConfig(level=logging.INFO,
-                    format="%(asctime)s %(levelname)s %(name)s %(message)s")
-log = logging.getLogger("main")
-
-LOCK_MAX_AGE_SEC = 3600
-
-# Source registry. mode:
-#   "each"   -> fetch(cfg) returns an iterable of payloads; normalize(payload, cfg) per payload
-#   "single" -> fetch(cfg) returns one payload; normalize(payload, cfg) once
-# Each source is isolated: one failing source never aborts the others.
-SOURCES = [
-    ("remotive", remotive.fetch, normalize_remotive, "each"),
-    ("remoteok", remoteok.fetch, normalize_remoteok, "single"),
-    ("wwr", wwr.fetch, normalize_wwr, "each"),
-    ("himalayas", himalayas.fetch, normalize_himalayas, "each"),
-    ("jobicy", jobicy.fetch, normalize_jobicy, "each"),
-    ("arbeitnow", arbeitnow.fetch, normalize_arbeitnow, "each"),
-    ("jobscollider", jobscollider.fetch, normalize_jobscollider, "each"),
-    ("jobspresso", jobspresso.fetch, normalize_jobspresso, "each"),
-    ("landingjobs", landingjobs.fetch, normalize_landingjobs, "each"),
-    ("workingnomads", workingnomads.fetch, normalize_workingnomads, "each"),
-    ("freelancer", freelancer.fetch, normalize_freelancer, "each"),
-    ("ats", ats.fetch, normalize_ats, "each"),
-]
+Task-1 tuning (per user decisions):
+- Over-senior titles (senior/lead/principal/...) are NOT hard-cut but strongly
+  downweighted via `seniority_mismatch_penalty`.
+- remote_confidence == "probably" is kept but strongly downweighted via
+  `remote_probably_penalty` and surfaced as a flag in risks (shown in digest).
+"""
+from .models import Job
 
 
-def acquire_lock(root: Path) -> Path | None:
-    lock = root / "data" / ".run.lock"
-    lock.parent.mkdir(parents=True, exist_ok=True)
-    if lock.exists():
-        age = time.time() - lock.stat().st_mtime
-        if age < LOCK_MAX_AGE_SEC:
-            log.error("another run in progress (lock age %.0fs), aborting", age)
-            return None
-        log.warning("stale lock (%.0fs), overwriting", age)
-    lock.write_text(datetime.now(timezone.utc).isoformat())
-    return lock
+def _clamp(x, lo, hi):
+    return max(lo, min(hi, x))
 
 
-def collect_all(cfg: dict) -> tuple[list, dict]:
-    jobs, errors = [], {}
-    for name, fetch_fn, normalize_fn, mode in SOURCES:
-        src_cfg = cfg["sources"].get(name, {})
-        if not src_cfg.get("enabled"):
-            continue
-        try:
-            payloads = fetch_fn(cfg)
-            if mode == "single":
-                jobs.extend(normalize_fn(payloads, cfg))
-            else:
-                for payload in payloads:
-                    jobs.extend(normalize_fn(payload, cfg))
-        except Exception as exc:  # noqa: BLE001 - isolate source failures
-            log.error("%s failed: %s", name, exc)
-            errors[name] = str(exc)[:120]
-    return jobs, errors
+def _title_component(title_low: str, cfg: dict, reasons: list) -> float:
+    best, best_phrase = 0.0, None
+    for phrase, weight in cfg["positive_titles"].items():
+        if phrase in title_low and weight > best:
+            best, best_phrase = float(weight), phrase
+    if best_phrase and best >= 0.6:
+        reasons.append(f"title matches target role ({best_phrase})")
+    return best
 
 
-def run() -> int:
-    cfg = load_config()
-    root = Path(cfg["root"])
-    started_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
-
-    lock = acquire_lock(root)
-    if lock is None:
-        return 1
-    try:
-        db = DB(str(root / "data" / "jobs.sqlite"))
-
-        if db.size_mb() > cfg["guards"]["max_db_mb"]:
-            log.error("DB size guard tripped: %.1f MB", db.size_mb())
-            send_telegram(f"Job Radar ALERT: DB size {db.size_mb():.0f} MB > guard. Run aborted.", cfg)
-            return 1
-
-        jobs, errors = collect_all(cfg)
-        enabled_count = sum(1 for n, *_ in SOURCES if cfg["sources"].get(n, {}).get("enabled"))
-        if jobs == [] and len(errors) >= max(3, enabled_count):
-            log.error("all sources failed")
-            send_telegram("Job Radar ALERT: all sources failed: " + str(errors), cfg)
-            return 1
-        log.info("fetched %d jobs, source errors: %s", len(jobs), errors or "none")
-
-        seen = db.existing_hashes()
-        fresh = []
-        for job in jobs:
-            job.content_hash = content_hash(job)
-            if job.content_hash not in seen:
-                seen.add(job.content_hash)
-                fresh.append(job)
-        log.info("new after dedupe: %d", len(fresh))
-
-        guard_tripped = len(fresh) > cfg["guards"]["max_new_per_run"]
-
-        for job in fresh:
-            apply_hard_filters(job, cfg)
-
-        to_score = [j for j in fresh if j.category != "skip"]
-        sim = Similarity(str(root / "profile" / "resume_en.md"))
-        cosines = sim.cosine_batch(
-            [f"{j.title} {j.description[:4000]}" for j in to_score])
-        for job, cos in zip(to_score, cosines):
-            score_job(job, cos, cfg)
-        for job in fresh:
-            if job.score is None:
-                job.score = 0
-
-        inserted = sum(db.insert_job(j) for j in fresh)
-        log.info("inserted %d rows", inserted)
-
-        if guard_tripped:
-            send_telegram(f"Job Radar ALERT: {len(fresh)} new jobs in one run "
-                          f"(guard {cfg['guards']['max_new_per_run']}). Possible parser bug. "
-                          f"Rows inserted, run stopped.", cfg)
-            db.record_run(started_at, len(jobs), inserted, {**errors, "guard": "max_new_per_run"})
-            return 1
-
-        db.retention(cfg)
-        run_count = db.record_run(started_at, len(jobs), inserted, errors)
-        db.maybe_vacuum(run_count, cfg["guards"]["vacuum_every_runs"])
-
-        dig = cfg["digest"]
-        rows = db.top_today(dig["top_n"], dig["min_score"])
-        fallback_used = False
-        if not rows:
-            rows = db.top_today(5, dig["fallback_min_score"])
-            fallback_used = bool(rows)
-        stats = {
-            "date": datetime.now(timezone.utc).strftime("%d.%m.%Y"),
-            "fetched": len(jobs), "inserted": inserted,
-            "apply_first": sum(1 for j in fresh if j.category == "apply_first"),
-            "good": sum(1 for j in fresh if j.category == "good"),
-        }
-        text = build_digest(rows, stats, errors, cfg)
-        if fallback_used:
-            text += "\n(показаны maybe-варианты: выше порога сегодня пусто)"
-        export_csv(rows, str(root / "data" / "digest_latest.csv"))
-        send_telegram(text, cfg)
-        db.close()
-        return 0
-    finally:
-        lock.unlink(missing_ok=True)
+def _similarity_component(cos: float, reasons: list) -> float:
+    norm = _clamp((cos - 0.1) / 0.5, 0.0, 1.0)
+    if norm >= 0.6:
+        reasons.append("strong profile similarity")
+    return norm
 
 
-if __name__ == "__main__":
-    sys.exit(run())
+def _salary_component(job: Job, reasons: list, risks: list) -> float:
+    if not job.salary_known:
+        risks.append("salary unknown")
+        return 0.4
+    lo = job.salary_min_usd_month or 0
+    if lo >= 2000:
+        reasons.append(f"salary ${lo:.0f}+/mo")
+        return 1.0
+    if lo >= 1300:
+        reasons.append(f"salary above threshold (${lo:.0f}/mo)")
+        return 0.7
+    # known salary with max >= threshold but min below it
+    risks.append("salary range starts below threshold")
+    return 0.4
+
+
+def _remote_component(job: Job, reasons: list, risks: list) -> float:
+    if job.remote_confidence == "yes":
+        reasons.append("remote")
+        return 1.0
+    # "probably" is the only other value that reaches scoring ("no" is hard-filtered).
+    # Flag + strong penalty are applied centrally in score_job.
+    return 0.6
+
+
+def _seniority_negative_hit(title_low: str, cfg: dict):
+    for word in cfg["seniority_negative"]:
+        if word in title_low:
+            return word
+    return None
+
+
+def _off_domain_hit(title_low: str, cfg: dict):
+    """HR/payroll/recruiting roles that hit generic title keywords but are
+    off-profile. Matched on TITLE only to avoid JD false positives."""
+    for term in cfg.get("off_domain_terms", []):
+        if term in title_low:
+            return term
+    return None
+
+
+def _seniority_component(title_low: str, cfg: dict, reasons: list) -> float:
+    if _seniority_negative_hit(title_low, cfg):
+        return 0.1  # flag + strong penalty applied centrally in score_job
+    for word in cfg["seniority_positive"]:
+        if word in title_low:
+            reasons.append(f"seniority fit ({word})")
+            return 1.0
+    return 0.6
+
+
+def _keywords_component(text_low: str, cfg: dict, reasons: list) -> float:
+    hits = [kw for kw in cfg["positive_keywords"] if kw in text_low]
+    if hits:
+        reasons.append("keywords: " + ", ".join(hits[:6]))
+    return _clamp(len(hits) / 5.0, 0.0, 1.0)
+
+
+def _penalties(text_low: str, loc_low: str, cfg: dict, risks: list) -> int:
+    penalty = 0
+    for kw in cfg["negative_keywords"]:
+        if kw in text_low:
+            penalty += 8
+            risks.append(f"negative keyword: {kw}")
+    penalty = min(penalty, 25)
+    for pattern in cfg["location_risk_patterns"]:
+        if pattern in text_low or pattern in loc_low:
+            penalty += 10
+            risks.append(f"location restriction ({pattern})")
+            break
+    return penalty
+
+
+def _adjustment_penalties(job: Job, title_low: str, cfg: dict, flags: list) -> int:
+    """Strong downweights that keep the job (never hard-cut). Flags are prepended
+    to risks so they survive the digest's 2-risk truncation."""
+    penalty = 0
+    sen = _seniority_negative_hit(title_low, cfg)
+    if sen:
+        p = int(cfg.get("seniority_mismatch_penalty", 30))
+        penalty += p
+        flags.append(f"\u2b07 over-senior ({sen}), downweight -{p}")
+    if job.remote_confidence == "probably":
+        p = int(cfg.get("remote_probably_penalty", 20))
+        penalty += p
+        flags.append(f"\u2691 remote only 'probably', downweight -{p}")
+    od = _off_domain_hit(title_low, cfg)
+    if od:
+        p = int(cfg.get("off_domain_penalty", 25))
+        penalty += p
+        flags.append(f"\u2b07 off-domain HR/payroll ({od}), downweight -{p}")
+    return penalty
+
+
+def categorize(score: int) -> str:
+    if score >= 80:
+        return "apply_first"
+    if score >= 65:
+        return "good"
+    if score >= 50:
+        return "maybe"
+    if score >= 35:
+        return "weak"
+    return "skip"
+
+
+def score_job(job: Job, cosine: float, cfg: dict) -> Job:
+    if job.category == "skip":  # hard filter already decided
+        job.score = 0
+        return job
+    reasons: list[str] = []
+    risks: list[str] = []
+    flags: list[str] = []
+    title_low = job.title.lower()
+    text_low = f"{job.title} {job.description}".lower()
+    loc_low = (job.location_raw or "").lower()
+    w = cfg["weights"]
+    raw = (
+        w["title"] * _title_component(title_low, cfg, reasons)
+        + w["similarity"] * _similarity_component(cosine, reasons)
+        + w["salary"] * _salary_component(job, reasons, risks)
+        + w["remote"] * _remote_component(job, reasons, risks)
+        + w["seniority"] * _seniority_component(title_low, cfg, reasons)
+        + w["keywords"] * _keywords_component(text_low, cfg, reasons)
+    )
+    penalty = _penalties(text_low, loc_low, cfg, risks)
+    penalty += _adjustment_penalties(job, title_low, cfg, flags)
+    score = int(_clamp(round(raw * 100 - penalty), 0, 100))
+    job.score = score
+    job.category = categorize(score)
+    job.reasons = reasons
+    job.risks = flags + risks  # flags first so the 2-risk digest shows them
+    return job
