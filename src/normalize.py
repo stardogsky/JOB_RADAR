@@ -176,3 +176,220 @@ def normalize_wwr(xml_text: str, cfg: dict) -> list[Job]:
             fetched_at=_now_iso(),
         ))
     return jobs
+
+
+# ---------------- Jobicy (API v2) ----------------
+
+def _annual_salary(smin, smax, currency: str, cfg: dict):
+    """Shared yearly-salary handling for API sources that expose numeric
+    annual min/max + currency. USD -> numeric path; other -> text path (which
+    applies currency_rates_to_usd from config). Returns (raw, known, lo, hi)."""
+    cur = (currency or "USD").upper()
+    try:
+        smin_f = float(smin) if smin not in (None, "", 0, "0") else 0.0
+        smax_f = float(smax) if smax not in (None, "", 0, "0") else 0.0
+    except (TypeError, ValueError):
+        return None, False, None, None
+    if not smin_f and not smax_f:
+        return None, False, None, None
+    if cur == "USD":
+        raw = f"{smin}-{smax} USD/year"
+        known, lo, hi = parse_salary_numbers(smin_f or smax_f, smax_f or smin_f, cfg)
+        return raw, known, lo, hi
+    raw = f"{smin}-{smax} {cur} per year"
+    known, lo, hi = parse_salary_text(raw, cfg)
+    return raw, known, lo, hi
+
+
+def normalize_jobicy(data: dict, cfg: dict) -> list[Job]:
+    jobs = []
+    for item in data.get("jobs", []):
+        title = normalize_spaces(str(item.get("jobTitle") or ""))
+        url = item.get("url") or ""
+        if not title or not url:
+            log.warning("jobicy: skipped item without title/url id=%s", item.get("id"))
+            continue
+        description = clean_description(item.get("jobDescription") or item.get("jobExcerpt") or "")
+        geo = normalize_spaces(str(item.get("jobGeo") or ""))
+        remote_confidence = "yes" if _has_remote_marker(geo or "anywhere", cfg) else "probably"
+        salary_raw, known, lo, hi = _annual_salary(
+            item.get("annualSalaryMin"), item.get("annualSalaryMax"),
+            item.get("salaryCurrency"), cfg)
+        tags = [str(t) for t in (item.get("jobIndustry") or [])]
+        tags += [str(t) for t in (item.get("jobType") or [])]
+        jobs.append(Job(
+            source="jobicy",
+            source_id=str(item.get("id") or "") or None,
+            title=title,
+            company=normalize_spaces(str(item.get("companyName") or "")) or None,
+            url=url,
+            location_raw=geo or None,
+            remote_confidence=remote_confidence,
+            salary_raw=salary_raw,
+            salary_known=known,
+            salary_min_usd_month=lo,
+            salary_max_usd_month=hi,
+            description=description,
+            tags=tags,
+            date_posted=(str(item.get("pubDate") or ""))[:10] or None,
+            fetched_at=_now_iso(),
+        ))
+    return jobs
+
+
+# ---------------- Arbeitnow (API) ----------------
+
+def normalize_arbeitnow(data: dict, cfg: dict) -> list[Job]:
+    jobs = []
+    for item in data.get("data", []):
+        title = normalize_spaces(str(item.get("title") or ""))
+        url = item.get("url") or ""
+        if not title or not url:
+            log.warning("arbeitnow: skipped item without title/url slug=%s", item.get("slug"))
+            continue
+        description = clean_description(item.get("description") or "")
+        location = normalize_spaces(str(item.get("location") or ""))
+        is_remote = bool(item.get("remote"))
+        if not is_remote:
+            remote_confidence = "no"
+        elif not location or _has_remote_marker(location, cfg):
+            remote_confidence = "yes"
+        else:
+            remote_confidence = "probably"
+        known, lo, hi = parse_salary_text(None, cfg)  # Arbeitnow API exposes no salary
+        date_posted = None
+        created = item.get("created_at")
+        if created:
+            try:
+                date_posted = datetime.fromtimestamp(int(created), tz=timezone.utc).date().isoformat()
+            except (TypeError, ValueError, OSError):
+                date_posted = str(created)[:10]
+        tags = [str(t) for t in (item.get("tags") or [])]
+        tags += [str(t) for t in (item.get("job_types") or [])]
+        jobs.append(Job(
+            source="arbeitnow",
+            source_id=str(item.get("slug") or "") or None,
+            title=title,
+            company=normalize_spaces(str(item.get("company_name") or "")) or None,
+            url=url,
+            location_raw=location or None,
+            remote_confidence=remote_confidence,
+            salary_raw=None,
+            salary_known=known,
+            salary_min_usd_month=lo,
+            salary_max_usd_month=hi,
+            description=description,
+            tags=tags,
+            date_posted=date_posted,
+            fetched_at=_now_iso(),
+        ))
+    return jobs
+
+
+# ---------------- Himalayas (API) ----------------
+
+def normalize_himalayas(data: dict, cfg: dict) -> list[Job]:
+    jobs = []
+    for item in data.get("jobs", []):
+        title = normalize_spaces(str(item.get("title") or ""))
+        url = item.get("applicationLink") or item.get("guid") or ""
+        if not title or not url:
+            log.warning("himalayas: skipped item without title/url guid=%s", item.get("guid"))
+            continue
+        description = clean_description(item.get("description") or item.get("excerpt") or "")
+        restrictions = item.get("locationRestrictions") or []
+        if isinstance(restrictions, str):
+            restrictions = [restrictions]
+        location = ", ".join(str(r) for r in restrictions) or None
+        if not restrictions or _has_remote_marker(location or "worldwide", cfg):
+            remote_confidence = "yes"
+        else:
+            remote_confidence = "probably"
+        salary_raw, known, lo, hi = _annual_salary(
+            item.get("minSalary") or item.get("salaryMin"),
+            item.get("maxSalary") or item.get("salaryMax"),
+            item.get("salaryCurrency"), cfg)
+        date_posted = None
+        pub = item.get("pubDate")
+        if pub:
+            try:
+                date_posted = datetime.fromtimestamp(int(pub), tz=timezone.utc).date().isoformat()
+            except (TypeError, ValueError, OSError):
+                date_posted = str(pub)[:10]
+        tags = [str(t) for t in (item.get("categories") or [])]
+        tags += [str(s) for s in (item.get("seniority") or [])]
+        jobs.append(Job(
+            source="himalayas",
+            source_id=str(item.get("guid") or url),
+            title=title,
+            company=normalize_spaces(str(item.get("companyName") or "")) or None,
+            url=url,
+            location_raw=location,
+            remote_confidence=remote_confidence,
+            salary_raw=salary_raw,
+            salary_known=known,
+            salary_min_usd_month=lo,
+            salary_max_usd_month=hi,
+            description=description,
+            tags=tags,
+            date_posted=date_posted,
+            fetched_at=_now_iso(),
+        ))
+    return jobs
+
+
+# ---------------- Generic remote-only RSS (JobsCollider, Jobspresso) ----------------
+
+def _normalize_rss(xml_text: str, source: str, cfg: dict) -> list[Job]:
+    jobs = []
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError as exc:
+        log.error("%s: RSS parse error: %s", source, exc)
+        return jobs
+    for item in root.iter("item"):
+        title = normalize_spaces(item.findtext("title") or "")
+        link = (item.findtext("link") or item.findtext("guid") or "").strip()
+        if not title or not link:
+            continue
+        description = clean_description(item.findtext("description") or "")
+        salary_raw = None
+        sal_match = re.search(r"(salary[^.\n]{0,120}|\$\s?\d[\d,]*(?:\s*-\s*\$?\d[\d,]*)?[^.\n]{0,40})",
+                              description, re.IGNORECASE)
+        if sal_match and "$" in sal_match.group(0):
+            salary_raw = normalize_spaces(sal_match.group(0))
+        known, lo, hi = parse_salary_text(salary_raw, cfg)
+        date_posted = None
+        pub = item.findtext("pubDate")
+        if pub:
+            try:
+                date_posted = parsedate_to_datetime(pub).date().isoformat()
+            except (TypeError, ValueError):
+                pass
+        tags = [c.text.strip() for c in item.findall("category") if c is not None and c.text]
+        jobs.append(Job(
+            source=source,
+            source_id=(item.findtext("guid") or link).strip(),
+            title=title,
+            company=None,
+            url=link,
+            location_raw=None,
+            remote_confidence="yes",  # remote-only boards
+            salary_raw=salary_raw,
+            salary_known=known,
+            salary_min_usd_month=lo,
+            salary_max_usd_month=hi,
+            description=description,
+            tags=tags,
+            date_posted=date_posted,
+            fetched_at=_now_iso(),
+        ))
+    return jobs
+
+
+def normalize_jobscollider(xml_text: str, cfg: dict) -> list[Job]:
+    return _normalize_rss(xml_text, "jobscollider", cfg)
+
+
+def normalize_jobspresso(xml_text: str, cfg: dict) -> list[Job]:
+    return _normalize_rss(xml_text, "jobspresso", cfg)
