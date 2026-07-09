@@ -266,6 +266,15 @@ telegram_mine:
   channels:
     - zarubezhom_jobs      # Connectable Jobs — RU-founder companies abroad
     - geekjobs             # Job in IT&Digital (geekjob.ru)
+    - remotegeekjob
+    - remoteit
+    - foranalysts
+    - opento_data
+    - pydevjobc
+    - young_june
+    - wntdan
+    - it_vakansii_jobs
+    - hiddengurus
 
 off_domain_penalty: 25           # HR/payroll/recruiting titles -> strong downweight (kept, not cut)
 off_domain_terms:                # matched against TITLE only (precise; avoids JD false positives)

@@ -62,6 +62,15 @@ def _seniority_negative_hit(title_low: str, cfg: dict):
     return None
 
 
+def _off_domain_hit(title_low: str, cfg: dict):
+    """HR/payroll/recruiting roles that hit generic title keywords but are
+    off-profile. Matched on TITLE only to avoid JD false positives."""
+    for term in cfg.get("off_domain_terms", []):
+        if term in title_low:
+            return term
+    return None
+
+
 def _seniority_component(title_low: str, cfg: dict, reasons: list) -> float:
     if _seniority_negative_hit(title_low, cfg):
         return 0.1  # flag + strong penalty applied centrally in score_job
@@ -107,6 +116,11 @@ def _adjustment_penalties(job: Job, title_low: str, cfg: dict, flags: list) -> i
         p = int(cfg.get("remote_probably_penalty", 20))
         penalty += p
         flags.append(f"\u2691 remote only 'probably', downweight -{p}")
+    od = _off_domain_hit(title_low, cfg)
+    if od:
+        p = int(cfg.get("off_domain_penalty", 25))
+        penalty += p
+        flags.append(f"\u2b07 off-domain HR/payroll ({od}), downweight -{p}")
     return penalty
 
 
