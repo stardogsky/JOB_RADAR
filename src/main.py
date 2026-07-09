@@ -6,14 +6,21 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .collectors import remoteok, remotive, wwr
+from .collectors import (
+    arbeitnow, himalayas, jobicy, jobscollider, jobspresso,
+    remoteok, remotive, wwr,
+)
 from .config import load_config
 from .db import DB
 from .dedupe import content_hash
 from .embeddings import Similarity
 from .export import export_csv
 from .filters import apply_hard_filters
-from .normalize import normalize_remoteok, normalize_remotive, normalize_wwr
+from .normalize import (
+    normalize_arbeitnow, normalize_himalayas, normalize_jobicy,
+    normalize_jobscollider, normalize_jobspresso,
+    normalize_remoteok, normalize_remotive, normalize_wwr,
+)
 from .notify import build_digest, send_telegram
 from .scoring import score_job
 
@@ -22,6 +29,21 @@ logging.basicConfig(level=logging.INFO,
 log = logging.getLogger("main")
 
 LOCK_MAX_AGE_SEC = 3600
+
+# Source registry. mode:
+#   "each"   -> fetch(cfg) returns an iterable of payloads; normalize(payload, cfg) per payload
+#   "single" -> fetch(cfg) returns one payload; normalize(payload, cfg) once
+# Each source is isolated: one failing source never aborts the others.
+SOURCES = [
+    ("remotive", remotive.fetch, normalize_remotive, "each"),
+    ("remoteok", remoteok.fetch, normalize_remoteok, "single"),
+    ("wwr", wwr.fetch, normalize_wwr, "each"),
+    ("himalayas", himalayas.fetch, normalize_himalayas, "each"),
+    ("jobicy", jobicy.fetch, normalize_jobicy, "each"),
+    ("arbeitnow", arbeitnow.fetch, normalize_arbeitnow, "each"),
+    ("jobscollider", jobscollider.fetch, normalize_jobscollider, "each"),
+    ("jobspresso", jobspresso.fetch, normalize_jobspresso, "each"),
+]
 
 
 def acquire_lock(root: Path) -> Path | None:
@@ -39,26 +61,20 @@ def acquire_lock(root: Path) -> Path | None:
 
 def collect_all(cfg: dict) -> tuple[list, dict]:
     jobs, errors = [], {}
-    if cfg["sources"]["remotive"]["enabled"]:
+    for name, fetch_fn, normalize_fn, mode in SOURCES:
+        src_cfg = cfg["sources"].get(name, {})
+        if not src_cfg.get("enabled"):
+            continue
         try:
-            for payload in remotive.fetch(cfg):
-                jobs.extend(normalize_remotive(payload, cfg))
+            payloads = fetch_fn(cfg)
+            if mode == "single":
+                jobs.extend(normalize_fn(payloads, cfg))
+            else:
+                for payload in payloads:
+                    jobs.extend(normalize_fn(payload, cfg))
         except Exception as exc:  # noqa: BLE001 - isolate source failures
-            log.error("remotive failed: %s", exc)
-            errors["remotive"] = str(exc)[:120]
-    if cfg["sources"]["remoteok"]["enabled"]:
-        try:
-            jobs.extend(normalize_remoteok(remoteok.fetch(cfg), cfg))
-        except Exception as exc:  # noqa: BLE001
-            log.error("remoteok failed: %s", exc)
-            errors["remoteok"] = str(exc)[:120]
-    if cfg["sources"]["wwr"]["enabled"]:
-        try:
-            for xml_text in wwr.fetch(cfg):
-                jobs.extend(normalize_wwr(xml_text, cfg))
-        except Exception as exc:  # noqa: BLE001
-            log.error("wwr failed: %s", exc)
-            errors["wwr"] = str(exc)[:120]
+            log.error("%s failed: %s", name, exc)
+            errors[name] = str(exc)[:120]
     return jobs, errors
 
 
@@ -79,7 +95,8 @@ def run() -> int:
             return 1
 
         jobs, errors = collect_all(cfg)
-        if jobs == [] and len(errors) >= 3:
+        enabled_count = sum(1 for n, *_ in SOURCES if cfg["sources"].get(n, {}).get("enabled"))
+        if jobs == [] and len(errors) >= max(3, enabled_count):
             log.error("all sources failed")
             send_telegram("Job Radar ALERT: all sources failed: " + str(errors), cfg)
             return 1
