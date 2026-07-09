@@ -211,7 +211,7 @@ sources:
       - "https://jobspresso.co/feed/?post_type=job_listing"
 
   landingjobs:
-    enabled: true
+    enabled: false         # 403 Forbidden: blocks programmatic access, disabled 2026-07-09
     urls:
       - "https://landing.jobs/api/v1/jobs"
   workingnomads:
@@ -245,7 +245,35 @@ sources:
       - { ats: ashby, slug: mercury, name: "Mercury" }
       - { ats: ashby, slug: replit, name: "Replit" }
       - { ats: lever, slug: storyprotocol, name: "Story Protocol" }
+      # --- mined from RU-founder Telegram channels (slugs confirmed via live apply-links) ---
+      - { ats: ashby, slug: ruby-labs, name: "Ruby Labs" }
+      - { ats: ashby, slug: kiefer, name: "Kiefer" }
+      - { ats: greenhouse, slug: miro, name: "Miro" }
+      - { ats: greenhouse, slug: agoda, name: "Agoda" }
+      - { ats: greenhouse, slug: anthropic, name: "Anthropic" }
+      - { ats: workable, slug: vivid-money, name: "Vivid Money" }
 
 # Scoring adjustments (task 1): strong downweight, NOT a hard cut.
 seniority_mismatch_penalty: 30   # senior/lead/principal/head/... points subtracted
 remote_probably_penalty: 20      # remote only "probably" -> points subtracted + flagged
+# Telegram channel mining (task 1B): runs automatically every pipeline run.
+# Each run fetches public t.me/s/<channel> previews, extracts hosted-ATS apply
+# links, and feeds discovered companies into the ATS collector (union with the
+# static companies list below). `python -m tools.mine_telegram` still works as a
+# manual preview. Set enabled:false to turn auto-mining off.
+telegram_mine:
+  enabled: true
+  channels:
+    - zarubezhom_jobs      # Connectable Jobs — RU-founder companies abroad
+    - geekjobs             # Job in IT&Digital (geekjob.ru)
+
+off_domain_penalty: 25           # HR/payroll/recruiting titles -> strong downweight (kept, not cut)
+off_domain_terms:                # matched against TITLE only (precise; avoids JD false positives)
+  - payroll
+  - benefits
+  - recruiting
+  - "talent acquisition"
+  - "hr operations"
+  - "people operations"
+  - "onboarding operations"
+  - hris
